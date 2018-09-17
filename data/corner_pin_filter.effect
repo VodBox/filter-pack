@@ -1,0 +1,132 @@
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float2 uv1;
+uniform float2 uv2;
+uniform float2 uv3;
+uniform float2 uv4;
+
+uniform int texwidth;
+uniform int texheight;
+
+uniform bool outline;
+
+sampler_state textureSampler {
+	Filter    = Linear;
+	AddressU  = Border;
+	AddressV  = Border;
+	BorderColor = 00000000;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+float distance(float2 a, float2 b) { return sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2)); }
+
+float distanceLine(VertData v_in) {
+	float a = abs(((uv2.y - uv1.y) * v_in.uv.x) - ((uv2.x - uv1.x) * v_in.uv.y) + (uv2.x * uv1.y) - (uv2.y * uv1.x)) / sqrt(pow(uv2.y - uv1.y, 2.0) + pow(uv2.x - uv1.x, 2.0));
+	float b = abs(((uv2.y - uv4.y) * v_in.uv.x) - ((uv2.x - uv4.x) * v_in.uv.y) + (uv2.x * uv4.y) - (uv2.y * uv4.x)) / sqrt(pow(uv2.y - uv4.y, 4.0) + pow(uv2.x - uv4.x, 4.0));
+	float c = abs(((uv4.y - uv3.y) * v_in.uv.x) - ((uv4.x - uv3.x) * v_in.uv.y) + (uv4.x * uv3.y) - (uv4.y * uv3.x)) / sqrt(pow(uv4.y - uv3.y, 2.0) + pow(uv4.x - uv3.x, 2.0));
+	float d = abs(((uv1.y - uv3.y) * v_in.uv.x) - ((uv1.x - uv3.x) * v_in.uv.y) + (uv1.x * uv3.y) - (uv1.y * uv3.x)) / sqrt(pow(uv1.y - uv3.y, 2.0) + pow(uv1.x - uv3.x, 2.0));
+	
+	return min(a, min(b, min(c, d)));
+}
+
+float distanceFour(VertData v_in) {
+	float a = distance(v_in.uv, uv1);
+    float b = distance(v_in.uv, uv2);
+    float c = distance(v_in.uv, uv3);
+    float d = distance(v_in.uv, uv4);
+	return min(a, min(b, min(c, d)));
+}
+
+float cross(float2 a, float2 b) { return a.x*b.y - a.y*b.x; }
+
+float4 bounds() {
+	float x1 = min(uv1.x, min(uv2.x, min(uv3.x, uv4.x))) - (1.0 / texwidth);
+	float x2 = max(uv1.x, max(uv2.x, max(uv3.x, uv4.x))) + (1.0 / texwidth);
+	float y1 = min(uv1.y, min(uv2.y, min(uv3.y, uv4.y))) - (1.0 / texheight);
+	float y2 = max(uv1.y, max(uv2.y, max(uv3.y, uv4.y)))  + (1.0 / texheight);
+	return float4(x1, y1, x2, y2);
+}
+
+float2 invBilinear(float2 p)
+{
+	float2 tempUV = uv1;
+	if(tempUV.x == 0) { tempUV.x = -0.001; }
+    float2 e = uv2-tempUV;
+    float2 f = uv3-tempUV;
+    float2 g = tempUV-uv2+uv4-uv3;
+    float2 h = p-tempUV;
+        
+    float k2 = cross( g, f );
+    float k1 = cross( e, f ) + cross( h, g );
+    float k0 = cross( h, e );
+    
+    float w = k1*k1 - 4.0*k0*k2;
+    
+    if( w<0.0 ) return float2(-1.0, -1.0);
+
+    w = sqrt( w );
+    
+    float v1 = (-k1 - w)/(2.0*k2);
+    float v2 = (-k1 + w)/(2.0*k2);
+    float u1 = (h.x - f.x*v1)/(e.x + g.x*v1);
+    float u2 = (h.x - f.x*v2)/(e.x + g.x*v2);
+    bool b1 = v1>0.0 && v1<1.0 && u1>0.0 && u1<1.0;
+    bool b2 = v2>0.0 && v2<1.0 && u2>0.0 && u2<1.0;
+    
+    float2 res = float2(-1.0, -1.0);
+
+    if(  b1 && !b2 ) res = float2( u1, v1 );
+    if( !b1 &&  b2 ) res = float2( u2, v2 );
+    
+    return res;
+}
+
+VertData VSCorner(VertData v_in)
+{
+	VertData vert_out;
+	vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv = v_in.uv;
+	return vert_out;
+}
+
+float4 PSCorner(VertData v_in) : TARGET
+{
+	if(outline == true) {
+		float dist = distanceFour(v_in);
+		if(dist < 0.01) {
+			return float4(0.0, 1.0 * (1 - (dist * 100)), 1.0,  (1 - (dist * 50)));
+		}
+		dist = distanceLine(v_in);
+		if(dist < 0.004){
+			return float4(0.2, 0.4, 0.8, (1 - (dist * 250)));
+		}
+	}
+	float4 resBounds = bounds();
+	if(v_in.uv.x < resBounds.x || v_in.uv.x > resBounds.z || v_in.uv.y < resBounds.y || v_in.uv.y > resBounds.w) {
+		return float4(0.0, 0.0, 0.0, 0.0);
+	}
+	float2 vert = invBilinear(v_in.uv);
+	return (image.Sample(textureSampler, vert)
+			+ image.Sample(textureSampler, float2(vert.x - (1.0 / texwidth / 2), vert.y))
+			+ image.Sample(textureSampler, float2(vert.x - (1.0 / texwidth / 2), vert.y + (1.0 / texheight / 2)))
+			+ image.Sample(textureSampler, float2(vert.x, vert.y + (1.0 / texheight / 2)))
+			+ image.Sample(textureSampler, float2(vert.x + (1.0 / texwidth / 2), vert.y + (1.0 / texheight / 2)))
+			+ image.Sample(textureSampler, float2(vert.x + (1.0 / texwidth / 2), vert.y))
+			+ image.Sample(textureSampler, float2(vert.x + (1.0 / texwidth / 2), vert.y - (1.0 / texheight / 2)))
+			+ image.Sample(textureSampler, float2(vert.x, vert.y - (1.0 / texheight / 2)))
+			+ image.Sample(textureSampler, float2(vert.x - (1.0 / texwidth / 2), vert.y - (1.0 / texheight / 2)))) / 9;
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSCorner(v_in);
+		pixel_shader  = PSCorner(v_in);
+	}
+}

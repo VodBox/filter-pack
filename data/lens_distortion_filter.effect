@@ -1,0 +1,60 @@
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform float strength;
+uniform float zoom;
+
+uniform int texheight;
+uniform int texwidth;
+
+sampler_state textureSampler {
+	Filter    = Linear;
+	AddressU  = Border;
+	AddressV  = Border;
+	BorderColor = 00000000;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+VertData VSCrop(VertData v_in)
+{
+	VertData vert_out;
+	vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv = v_in.uv;
+	return vert_out;
+}
+
+float4 PSCrop(VertData v_in) : TARGET
+{
+	float ratio = texwidth / texheight;
+	float offsetX = v_in.uv.x  - 0.5;
+	float offsetY = (v_in.uv.y - 0.5) / ratio;
+	float distance = pow(pow(offsetX, 2.0) + pow(offsetY, 2.0), 1.0/2.0);
+	float angle = asin(offsetY / distance);
+	distance = pow(pow(distance, 1.0/50.0) + (strength/100), 50.0);
+	float newX;
+	float newY;
+	if(v_in.uv.x < 0.5) {
+		newX = (-(cos(angle) * distance) / pow(zoom, 50.0)) + 0.5;
+	} else {
+		newX = ((cos(angle) * distance) / pow(zoom, 50.0)) + 0.5;
+	}
+	if(v_in.uv.y < 0.5) {
+		newY = ((sin(angle) * distance) / pow(zoom, 50.0)) + 0.5;
+	} else {
+		newY = ((sin(angle) * distance) / pow(zoom, 50.0)) + 0.5;
+	}
+	return image.Sample(textureSampler, float2(newX, newY));
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSCrop(v_in);
+		pixel_shader  = PSCrop(v_in);
+	}
+}
