@@ -82,7 +82,7 @@ CornerPinWindow::CornerPinWindow(QWidget *parent, obs_source_t *source_,
 		char *name = (char *)obs_source_get_name(source);
 		if (name == obs_source_get_name(window->source)) {
 			int items = window->comboBox->count();
-			window->comboBox->addItem(("#" + to_string(items + 1))
+			window->comboBox->insertItem(0, ("#" + to_string(items + 1))
 				.c_str(), obs_sceneitem_get_id(item));
 		}
 		return true;
@@ -112,29 +112,24 @@ CornerPinWindow::CornerPinWindow(QWidget *parent, obs_source_t *source_,
 	auto checked = [this](int state) {
 		bool enabled = state == Qt::Checked;
 		cornerWidget->zoom = enabled;
-		if (enabled) {
-			obs_scene_enum_items(scene, [](obs_scene_t*, obs_sceneitem_t *item, void *param)
-			{
-				obs_source_t *source = obs_sceneitem_get_source(item);
-				CornerPinWindow *window = (CornerPinWindow *)param;
-				char *name = (char *)obs_source_get_name(source);
-				int64_t comboId = (int64_t)window->comboBox
-					->currentData().toInt();
-				int64_t itemId = obs_sceneitem_get_id(item);
-				if (name == obs_source_get_name(window->source)
-					&& comboId == itemId) {
-					window->cornerWidget->sceneitem = item;
-				}
-
-				return true;
-			}, this);
-		}
-		else {
-			obs_sceneitem_release(cornerWidget->sceneitem);
-			cornerWidget->sceneitem = nullptr;
-		}
 	};
 
+	auto changed = [this](int index) {
+		obs_scene_enum_items(scene, [](obs_scene_t*, obs_sceneitem_t *item, void *param)
+		{
+			obs_source_t *source = obs_sceneitem_get_source(item);
+			CornerPinWindow *window = (CornerPinWindow *)param;
+			char *name = (char *)obs_source_get_name(source);
+			if (name == obs_source_get_name(window->source)
+				&& obs_sceneitem_get_id(item)
+				== window->comboBox->currentData()) {
+				window->cornerWidget->sceneitem = item;
+			}
+			return true;
+		}, this);
+	};
+
+	connect(comboBox, QOverload<int>::of(&QComboBox::activated), changed);
 	connect(check, &QCheckBox::stateChanged, checked);
 
 	obs_source_release(curScene);
@@ -397,14 +392,54 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 	uint32_t sceneCX = max(obs_source_get_width(currentScene), 1u);
 	uint32_t sceneCY = max(obs_source_get_height(currentScene), 1u);
 
+	uint32_t areaCX;
+	uint32_t areaCY;
+
+	vec2  itemScale, itemSize, pos;
+	itemScale.x = 1.0f;
+	itemScale.y = 1.0f;
+
 	int   x, y;
 	int   newCX, newCY;
+	int   offX, offY;
 	float scale;
 
-	GetScaleAndCenterPos(sceneCX, sceneCY, cx, cy, x, y, scale);
+	if(window->sceneitem) {
+		obs_sceneitem_get_scale(window->sceneitem, &itemScale);
 
-	newCX = int(scale * float(sceneCX));
-	newCY = int(scale * float(sceneCY));
+		if(window->zoom) {
+			areaCX = max(obs_source_get_width(window->source), 1u)
+				* itemScale.x;
+			areaCY = max(obs_source_get_height(window->source), 1u)
+				* itemScale.y;
+		} else {
+			areaCX = sceneCX;
+			areaCY = sceneCY;
+
+			itemSize.x = max(obs_source_get_width(window->source), 1u)
+				* itemScale.x;
+			itemSize.y = max(obs_source_get_width(window->source), 1u)
+				* itemScale.x;
+		}
+
+		obs_sceneitem_get_pos(window->sceneitem, &pos);
+
+		offX = pos.x;
+		offY = pos.y;
+
+		GetScaleAndCenterPos(areaCX, areaCY, cx, cy, x, y, scale);
+	} else {
+		areaCX = sceneCX;
+		areaCY = sceneCY;
+
+		offX = 0;
+		offY = 0;
+
+		GetScaleAndCenterPos(areaCX, areaCY, cx, cy, x, y, scale);
+	}
+
+	newCX = int(scale * float(areaCX));
+	newCY = int(scale * float(areaCY));
 
 	window->offX = x;
 	window->offY = y;
@@ -414,51 +449,80 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 
 	gs_viewport_push();
 	gs_projection_push();
-	gs_ortho(0.0f, float(sceneCX), 0.0f, float(sceneCY),
-		-100.0f, 100.0f);
+
+	if(window->sceneitem && window->zoom) {
+		gs_ortho(offX, areaCX + offX, offY, areaCY + offY,
+			-100.0f, 100.0f);
+	} else {
+		gs_ortho(0.0f, sceneCX, 0.0f, sceneCY,
+			-100.0f, 100.0f);
+	}
+
 	gs_set_viewport(x, y, newCX, newCY);
 
 	obs_source_video_render(currentScene);
 
-	obs_source_video_render(window->source);
+	if (obs_sceneitem_visible(window->sceneitem)) {
+		if (window->sceneitem && window->zoom) {
+			gs_ortho(0.0f, float(sceneCX), 0.0f, float(sceneCY),
+				-100.0f, 100.0f);
+			offX = 0;
+			offY = 0;
 
-	drawLine(filter->topLeftX, filter->topLeftY,
-		filter->topRightX, filter->topRightY, window->verts, 0);
-	drawLine(filter->topRightX, filter->topRightY,
-		filter->bottomRightX, filter->bottomRightY, window->verts, 1);
-	drawLine(filter->bottomRightX, filter->bottomRightY,
-		filter->bottomLeftX, filter->bottomLeftY, window->verts, 2);
-	drawLine(filter->bottomLeftX, filter->bottomLeftY,
-		filter->topLeftX, filter->topLeftY, window->verts, 3);
+			itemScale.x = 1.0f;
+			itemScale.y = 1.0f;
+		}
 
-	drawHandle(filter->topLeftX, filter->topLeftY,
-		window->selected == 1, window->verts, 4);
-	drawHandle(filter->topRightX, filter->topRightY,
-		window->selected == 2, window->verts, 5);
-	drawHandle(filter->bottomLeftX, filter->bottomLeftY,
-		window->selected == 3, window->verts, 6);
-	drawHandle(filter->bottomRightX, filter->bottomRightY,
-		window->selected == 4, window->verts, 7);
+		drawLine(filter->topLeftX * itemScale.x + offX,
+			filter->topLeftY * itemScale.y + offY,
+			filter->topRightX * itemScale.x + offX,
+			filter->topRightY * itemScale.y + offY, window->verts, 0);
+		drawLine(filter->topRightX * itemScale.x + offX,
+			filter->topRightY * itemScale.y + offY,
+			filter->bottomRightX * itemScale.x + offX,
+			filter->bottomRightY * itemScale.y + offY, window->verts, 1);
+		drawLine(filter->bottomRightX * itemScale.x + offX,
+			filter->bottomRightY * itemScale.y + offY,
+			filter->bottomLeftX * itemScale.x + offX,
+			filter->bottomLeftY * itemScale.y + offY, window->verts, 2);
+		drawLine(filter->bottomLeftX * itemScale.x + offX,
+			filter->bottomLeftY * itemScale.y + offY,
+			filter->topLeftX * itemScale.x + offX,
+			filter->topLeftY * itemScale.y + offY, window->verts, 3);
 
-	if (window->mouseDrag) {
-		uint32_t textWidth = obs_source_get_width(window->text);
-		uint32_t textHeight = obs_source_get_height(window->text);
+		drawHandle(filter->topLeftX * itemScale.x + offX,
+			filter->topLeftY * itemScale.y + offY,
+			window->selected == 1, window->verts, 4);
+		drawHandle(filter->topRightX * itemScale.x + offX,
+			filter->topRightY * itemScale.y + offY,
+			window->selected == 2, window->verts, 5);
+		drawHandle(filter->bottomLeftX * itemScale.x + offX,
+			filter->bottomLeftY * itemScale.y + offY,
+			window->selected == 3, window->verts, 6);
+		drawHandle(filter->bottomRightX * itemScale.x + offX,
+			filter->bottomRightY * itemScale.y + offY,
+			window->selected == 4, window->verts, 7);
 
-		int tX = window->movedMouse.x + 10;
-		tX = min(tX, (int)(sceneCX - textWidth - 10));
-		tX = max(tX, 10);
+		if (window->mouseDrag) {
+			uint32_t textWidth = obs_source_get_width(window->text);
+			uint32_t textHeight = obs_source_get_height(window->text);
 
-		int tY = window->movedMouse.y - window->textSize / 2;
-		tY = min(tY, int(sceneCY - textHeight - 10));
-		tY = max(tY, 10);
+			int tX = (window->movedMouse.x - pos.x)*itemScale.x + 10;
+			tX = min(tX, (int)(sceneCX - textWidth - 10));
+			tX = max(tX, 10);
 
-		vec3 offset;
-		vec3_set(&offset, tX, tY, 0.0f);
+			int tY = (window->movedMouse.y - pos.y)*itemScale.y - window->textSize / 2;
+			tY = min(tY, int(sceneCY - textHeight - 10));
+			tY = max(tY, 10);
 
-		gs_matrix_push();
-		gs_matrix_translate(&offset);
-		obs_source_video_render(window->text);
-		gs_matrix_pop();
+			vec3 offset;
+			vec3_set(&offset, tX, tY, 0.0f);
+
+			gs_matrix_push();
+			gs_matrix_translate(&offset);
+			obs_source_video_render(window->text);
+			gs_matrix_pop();
+		}
 	}
 
 	gs_projection_pop();
@@ -508,7 +572,23 @@ void CornerPinWidget::mousePressEvent(QMouseEvent *event)
 {
 	corner_pin_data *filter = (corner_pin_data *)filter_data;
 
+	vec2 itemScale, pos;
+	obs_sceneitem_get_scale(sceneitem, &itemScale);
+	obs_sceneitem_get_pos(sceneitem, &pos);
+
+	uint32_t width = obs_source_get_width(source);
+	uint32_t height = obs_source_get_height(source);
+
+	vec2 scale;
+	vec2_set(&scale, previewW / float(width), previewH / float(height));
+
 	vec2_set(&mouse, event->x() - offX, event->y() - offY);
+	if(!zoom) {
+		vec2_div(&mouse, &mouse, &scale);
+		vec2_sub(&mouse, &mouse, &pos);
+		vec2_div(&mouse, &mouse, &itemScale);
+		vec2_mul(&mouse, &mouse, &scale);
+	}
 
 	vec2 res;
 	vec2_set(&res, previewW, previewH);
@@ -545,8 +625,20 @@ void CornerPinWidget::mouseMoveEvent(QMouseEvent *event)
 {
 	corner_pin_data *filter = (corner_pin_data *)filter_data;
 
+	vec2 itemScale, pos;
+	obs_sceneitem_get_scale(sceneitem, &itemScale);
+	obs_sceneitem_get_pos(sceneitem, &pos);
+
+	int addX = !zoom ? 0 : pos.x / itemScale.x;
+	int addY = !zoom ? 0 : pos.y / itemScale.y;
+
 	vec2_set(&movedMouse, event->x() - offX, event->y() - offY);
 	vec2_mulf(&movedMouse, &movedMouse, 1/previewScale);
+
+	if (!zoom) {
+		vec2_sub(&movedMouse, &movedMouse, &pos);
+		vec2_div(&movedMouse, &movedMouse, &itemScale);
+	}
 
 	obs_data_t *settings = obs_source_get_settings(filter->context);
 
@@ -555,6 +647,9 @@ void CornerPinWidget::mouseMoveEvent(QMouseEvent *event)
 		obs_source_set_enabled(text, true);
 	}
 	if (mouseDrag) {
+		if (zoom)
+			vec2_div(&movedMouse, &movedMouse, &itemScale);
+
 		corner_pin_data *filter = (corner_pin_data *)filter_data;
 		if (selected == 1) {
 			filter->topLeftX = movedMouse.x;

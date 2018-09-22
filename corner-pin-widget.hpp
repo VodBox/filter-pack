@@ -66,7 +66,7 @@ class CornerPinWidget : public QWidget {
 	void wheelEvent(QWheelEvent *event) override;
 public:
 	obs_source_t *source;
-	obs_sceneitem_t *sceneitem;
+	obs_sceneitem_t *sceneitem = nullptr;
 	bool zoom = false;
 
 	CornerPinWidget(QWidget *parent, obs_source_t *source_, void *data);
