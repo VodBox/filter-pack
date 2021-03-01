@@ -4,7 +4,7 @@
 struct stroke_data {
 	obs_source_t *context;
 	gs_effect_t *effect;
-	gs_eparam_t *color_param, *sharp_param;
+	gs_eparam_t *color_param;
 	gs_eparam_t *width, *height;
 	gs_eparam_t *image;
 
@@ -13,7 +13,6 @@ struct stroke_data {
 	uint32_t stroke_width;
 	vec4 color;
 	vec4 color_srgb;
-	bool sharp;
 };
 
 static const char *stroke_getname(void *unused)
@@ -27,12 +26,13 @@ static void stroke_update(void *data, obs_data_t *settings)
 	struct stroke_data *filter = (stroke_data *)data;
 
 	filter->stroke_width = (uint32_t)obs_data_get_int(settings, "width");
-	filter->sharp = obs_data_get_bool(settings, "sharp");
 
 	uint32_t color = (uint32_t)obs_data_get_int(settings, "color");
 
 	vec4_from_rgba(&filter->color, color);
+#ifdef sRGB_SUPPORT
 	vec4_from_rgba_srgb(&filter->color_srgb, color);
+#endif
 }
 
 static void stroke_destroy(void *data)
@@ -64,8 +64,6 @@ static void *stroke_create(obs_data_t *settings, obs_source_t *context)
 	if (filter->effect) {
 		filter->color_param =
 			gs_effect_get_param_by_name(filter->effect, "color");
-		filter->sharp_param =
-			gs_effect_get_param_by_name(filter->effect, "sharp");
 		filter->width =
 			gs_effect_get_param_by_name(filter->effect, "texwidth");
 		filter->height = gs_effect_get_param_by_name(filter->effect,
@@ -130,19 +128,21 @@ static void stroke_render(void *data, gs_effect_t *effect)
 
 	gs_blend_state_pop();
 
+#ifdef sRGB_SUPPORT
 	const bool linear_srgb = gs_get_linear_srgb() ||
 				 (filter->color.w < 1.0f);
 
 	const bool previous = gs_framebuffer_srgb_enabled();
 	gs_enable_framebuffer_srgb(linear_srgb);
 
-	gs_effect_set_bool(filter->sharp_param, filter->sharp);
-
 	if (linear_srgb) {
 		gs_effect_set_vec4(filter->color_param, &filter->color_srgb);
 	} else {
+#endif
 		gs_effect_set_vec4(filter->color_param, &filter->color);
+#ifdef sRGB_SUPPORT
 	}
+#endif
 
 	gs_effect_set_int(filter->height, cy);
 	gs_effect_set_int(filter->width, cx);
@@ -167,11 +167,15 @@ static void stroke_render(void *data, gs_effect_t *effect)
 			gs_ortho(0.0f, (float)cx, 0.0f, (float)cy, -100.0f,
 				 100.0f);
 
+#ifdef sRGB_SUPPORT
 			if (linear_srgb) {
 				gs_effect_set_texture_srgb(filter->image, tex);
 			} else {
+#endif
 				gs_effect_set_texture(filter->image, tex);
+#ifdef sRGB_SUPPORT
 			}
+#endif
 
 			gs_technique_t *tech =
 				gs_effect_get_technique(filter->effect, "Draw");
@@ -201,9 +205,11 @@ static void stroke_render(void *data, gs_effect_t *effect)
 		gs_eparam_t *image =
 			gs_effect_get_param_by_name(effect, "image");
 
+#ifdef sRGB_SUPPORT
 		if (linear_srgb)
 			gs_effect_set_texture_srgb(image, tex);
 		else
+#endif
 			gs_effect_set_texture(image, tex);
 
 		while (gs_effect_loop(effect, "Draw"))
@@ -212,7 +218,9 @@ static void stroke_render(void *data, gs_effect_t *effect)
 		gs_texture_destroy(tex);
 	}
 
+#ifdef sRGB_SUPPORT
 	gs_enable_framebuffer_srgb(previous);
+#endif
 
 	UNUSED_PARAMETER(effect);
 }
@@ -221,9 +229,8 @@ static obs_properties_t *stroke_properties(void *data)
 {
 	obs_properties_t *props = obs_properties_create();
 
-	obs_properties_add_int(props, "width", "Stroke Width", 1, 10, 1);
+	obs_properties_add_int_slider(props, "width", "Stroke Width", 1, 50, 1);
 	obs_properties_add_color(props, "color", "Stroke Color");
-	obs_properties_add_bool(props, "sharp", "Sharp Corners");
 
 	UNUSED_PARAMETER(data);
 	return props;
@@ -233,7 +240,6 @@ static void stroke_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_int(settings, "width", 1);
 	obs_data_set_default_int(settings, "color", 0xFFFFFFFF);
-	obs_data_set_default_bool(settings, "sharp", false);
 }
 
 struct obs_source_info stroke_filter = [&] {

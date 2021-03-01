@@ -1,5 +1,7 @@
 project(filter-pack)
 
+option(sRGB_SUPPORT "Whether to build assuming sRGB is available" ON)
+
 include_directories("${CMAKE_SOURCE_DIR}/UI")
 
 find_package(Qt5Widgets REQUIRED)
@@ -24,5 +26,9 @@ target_link_libraries(filter-pack
 	Qt5::Widgets)
 
 set_target_properties(filter-pack PROPERTIES FOLDER "plugins")
+
+if(sRGB_SUPPORT)
+    target_compile_definitions(filter-pack PRIVATE sRGB_SUPPORT)
+endif()
 
 install_obs_plugin_with_data(filter-pack data)
