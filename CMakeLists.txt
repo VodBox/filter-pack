@@ -22,4 +22,6 @@ target_link_libraries(filter-pack
 	obs-frontend-api
 	Qt5::Widgets)
 
+set_target_properties(filter-pack PROPERTIES FOLDER "plugins")
+
 install_obs_plugin_with_data(filter-pack data)

@@ -265,7 +265,7 @@ void CornerPinWidget::CreateDisplay()
 	info.window.display = QX11Info::display();
 #endif
 
-	display = obs_display_create(&info);
+	display = obs_display_create(&info, 0);
 
 	obs_display_add_draw_callback(this->GetDisplay(),
 		drawPreview, this);
