@@ -32,35 +32,35 @@ struct TextSource {
 };
 
 struct corner_pin_data {
-	obs_source_t                   *context;
+	obs_source_t *context;
 
-	gs_effect_t                    *effect;
-	gs_eparam_t                    *uv1_param, *uv2_param, *uv3_param, *uv4_param;
-	gs_eparam_t                    *width, *height;
+	gs_effect_t *effect;
+	gs_eparam_t *uv1_param, *uv2_param, *uv3_param, *uv4_param;
+	gs_eparam_t *width, *height;
 	gs_eparam_t *outline_param;
 
-	int                            topLeftX;
-	int                            topRightX;
-	int                            bottomLeftX;
-	int                            bottomRightX;
-	int                            topLeftY;
-	int                            topRightY;
-	int                            bottomLeftY;
-	int                            bottomRightY;
-	float                          texwidth, texheight;
-	struct vec2                    uv1;
-	struct vec2                    uv2;
-	struct vec2                    uv3;
-	struct vec2                    uv4;
+	int topLeftX;
+	int topRightX;
+	int bottomLeftX;
+	int bottomRightX;
+	int topLeftY;
+	int topRightY;
+	int bottomLeftY;
+	int bottomRightY;
+	float texwidth, texheight;
+	struct vec2 uv1;
+	struct vec2 uv2;
+	struct vec2 uv3;
+	struct vec2 uv4;
 	bool outline;
 
-	CornerPinWidget                *window;
+	CornerPinWidget *window;
 };
 
 using namespace std;
 
 CornerPinWindow::CornerPinWindow(QWidget *parent, obs_source_t *source_,
-	void *data)
+				 void *data)
 	: QWidget(parent)
 {
 	setAttribute(Qt::WA_NativeWindow);
@@ -75,24 +75,28 @@ CornerPinWindow::CornerPinWindow(QWidget *parent, obs_source_t *source_,
 
 	QHBoxLayout *horizontalLayout = new QHBoxLayout(this);
 	comboBox = new QComboBox(this);
-	obs_scene_enum_items(scene, [](obs_scene_t*, obs_sceneitem_t *item, void *param)
-	{
-		obs_source_t *source = obs_sceneitem_get_source(item);
-		CornerPinWindow *window = (CornerPinWindow *)param;
-		char *name = (char *)obs_source_get_name(source);
-		if (name == obs_source_get_name(window->source)) {
-			int items = window->comboBox->count();
-			window->comboBox->insertItem(0, ("#" + to_string(items + 1))
-				.c_str(), obs_sceneitem_get_id(item));
-		}
-		return true;
-	}, this);
+	obs_scene_enum_items(
+		scene,
+		[](obs_scene_t *, obs_sceneitem_t *item, void *param) {
+			obs_source_t *source = obs_sceneitem_get_source(item);
+			CornerPinWindow *window = (CornerPinWindow *)param;
+			char *name = (char *)obs_source_get_name(source);
+			if (name == obs_source_get_name(window->source)) {
+				int items = window->comboBox->count();
+				window->comboBox->insertItem(
+					0, ("#" + to_string(items + 1)).c_str(),
+					obs_sceneitem_get_id(item));
+			}
+			return true;
+		},
+		this);
 	QCheckBox *check = new QCheckBox("Zoom To Scene Item", this);
 
 	QSizePolicy sizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	sizePolicy.setHorizontalStretch(0);
 	sizePolicy.setVerticalStretch(0);
-	sizePolicy.setHeightForWidth(cornerWidget->sizePolicy().hasHeightForWidth());
+	sizePolicy.setHeightForWidth(
+		cornerWidget->sizePolicy().hasHeightForWidth());
 	cornerWidget->setSizePolicy(sizePolicy);
 	cornerWidget->setMinimumSize(QSize(20, 20));
 
@@ -115,18 +119,24 @@ CornerPinWindow::CornerPinWindow(QWidget *parent, obs_source_t *source_,
 	};
 
 	auto changed = [this](int index) {
-		obs_scene_enum_items(scene, [](obs_scene_t*, obs_sceneitem_t *item, void *param)
-		{
-			obs_source_t *source = obs_sceneitem_get_source(item);
-			CornerPinWindow *window = (CornerPinWindow *)param;
-			char *name = (char *)obs_source_get_name(source);
-			if (name == obs_source_get_name(window->source)
-				&& obs_sceneitem_get_id(item)
-				== window->comboBox->currentData()) {
-				window->cornerWidget->sceneitem = item;
-			}
-			return true;
-		}, this);
+		obs_scene_enum_items(
+			scene,
+			[](obs_scene_t *, obs_sceneitem_t *item, void *param) {
+				obs_source_t *source =
+					obs_sceneitem_get_source(item);
+				CornerPinWindow *window =
+					(CornerPinWindow *)param;
+				char *name =
+					(char *)obs_source_get_name(source);
+				if (name == obs_source_get_name(
+						    window->source) &&
+				    obs_sceneitem_get_id(item) ==
+					    window->comboBox->currentData()) {
+					window->cornerWidget->sceneitem = item;
+				}
+				return true;
+			},
+			this);
 	};
 
 	connect(comboBox, QOverload<int>::of(&QComboBox::activated), changed);
@@ -153,7 +163,7 @@ CornerPinWindow::~CornerPinWindow()
 }
 
 CornerPinWidget::CornerPinWidget(QWidget *parent, obs_source_t *source_,
-	void *data)
+				 void *data)
 	: QWidget(parent)
 {
 	filter_data = data;
@@ -168,22 +178,20 @@ CornerPinWidget::CornerPinWidget(QWidget *parent, obs_source_t *source_,
 
 	fill(verts, verts + 8, nullptr);
 
-	auto windowVisible = [this](bool visible)
-	{
+	auto windowVisible = [this](bool visible) {
 		if (!visible)
 			return;
 
 		if (!display) {
 			CreateDisplay();
-		}
-		else {
+		} else {
 			QSize size = this->size() * this->devicePixelRatio();
-			obs_display_resize(display, size.width(), size.height());
+			obs_display_resize(display, size.width(),
+					   size.height());
 		}
 	};
 
-	auto sizeChanged = [this](QScreen*)
-	{
+	auto sizeChanged = [this](QScreen *) {
 		CreateDisplay();
 
 		QSize size = this->size() * this->devicePixelRatio();
@@ -196,10 +204,9 @@ CornerPinWidget::CornerPinWidget(QWidget *parent, obs_source_t *source_,
 
 CornerPinWidget::~CornerPinWidget()
 {
-	obs_display_remove_draw_callback(this->GetDisplay(),
-		drawPreview, this);
+	obs_display_remove_draw_callback(this->GetDisplay(), drawPreview, this);
 	obs_display_destroy(display);
-	if(text)
+	if (text)
 		obs_source_release(text);
 
 	obs_enter_graphics();
@@ -242,9 +249,9 @@ void CornerPinWidget::CreateDisplay()
 #else
 	const char *text_source_id = "text_ft2_source";
 #endif
-	if(!text)
+	if (!text)
 		text = obs_source_create_private(text_source_id, "test",
-			settings);
+						 settings);
 	obs_data_release(settings);
 	obs_data_release(font);
 
@@ -267,8 +274,7 @@ void CornerPinWidget::CreateDisplay()
 
 	display = obs_display_create(&info, 0);
 
-	obs_display_add_draw_callback(this->GetDisplay(),
-		drawPreview, this);
+	obs_display_add_draw_callback(this->GetDisplay(), drawPreview, this);
 }
 
 void CornerPinWidget::handleResizeRequest(int width, int height)
@@ -277,9 +283,8 @@ void CornerPinWidget::handleResizeRequest(int width, int height)
 	UNUSED_PARAMETER(height);
 }
 
-static void GetScaleAndCenterPos(
-	int baseCX, int baseCY, int windowCX, int windowCY,
-	int &x, int &y, float &scale)
+static void GetScaleAndCenterPos(int baseCX, int baseCY, int windowCX,
+				 int windowCY, int &x, int &y, float &scale)
 {
 	double windowAspect, baseAspect;
 	int newCX, newCY;
@@ -291,8 +296,7 @@ static void GetScaleAndCenterPos(
 		scale = float(windowCY) / float(baseCY);
 		newCX = int(double(windowCY) * baseAspect);
 		newCY = windowCY;
-	}
-	else {
+	} else {
 		scale = float(windowCX) / float(baseCX);
 		newCX = windowCX;
 		newCY = int(float(windowCX) / baseAspect);
@@ -302,9 +306,10 @@ static void GetScaleAndCenterPos(
 	y = windowCY / 2 - newCY / 2;
 }
 
-static void fillVert(float r, float g, float b, float a) {
-	gs_effect_t    *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
-	gs_eparam_t    *color = gs_effect_get_param_by_name(solid, "color");
+static void fillVert(float r, float g, float b, float a)
+{
+	gs_effect_t *solid = obs_get_base_effect(OBS_EFFECT_SOLID);
+	gs_eparam_t *color = gs_effect_get_param_by_name(solid, "color");
 	gs_technique_t *tech = gs_effect_get_technique(solid, "Solid");
 
 	vec4 colorVal;
@@ -321,7 +326,7 @@ static void fillVert(float r, float g, float b, float a) {
 }
 
 static void drawLine(int x1, int y1, int x2, int y2, gs_vertbuffer_t **verts,
-	int index)
+		     int index)
 {
 	int border = 2;
 
@@ -332,15 +337,15 @@ static void drawLine(int x1, int y1, int x2, int y2, gs_vertbuffer_t **verts,
 	double rotSin = sin(angle);
 	double rotCos = cos(angle);
 
-	float cx1 = x1 + border * (-1*rotCos - -1*rotSin);
-	float cx2 = x1 + border * (-1*rotCos - 1*rotSin);
-	float cx3 = x2 + border * (1*rotCos - 1*rotSin);
-	float cx4 = x2 + border * (1*rotCos - -1*rotSin);
+	float cx1 = x1 + border * (-1 * rotCos - -1 * rotSin);
+	float cx2 = x1 + border * (-1 * rotCos - 1 * rotSin);
+	float cx3 = x2 + border * (1 * rotCos - 1 * rotSin);
+	float cx4 = x2 + border * (1 * rotCos - -1 * rotSin);
 
-	float cy1 = y1 + border * (-1*rotSin + -1*rotCos);
-	float cy2 = y1 + border * (-1*rotSin + 1*rotCos);
-	float cy3 = y2 + border * (1*rotSin + 1*rotCos);
-	float cy4 = y2 + border * (1*rotSin + -1*rotCos);
+	float cy1 = y1 + border * (-1 * rotSin + -1 * rotCos);
+	float cy2 = y1 + border * (-1 * rotSin + 1 * rotCos);
+	float cy3 = y2 + border * (1 * rotSin + 1 * rotCos);
+	float cy4 = y2 + border * (1 * rotSin + -1 * rotCos);
 
 	if (verts[index])
 		gs_vertexbuffer_destroy(verts[index]);
@@ -358,19 +363,20 @@ static void drawLine(int x1, int y1, int x2, int y2, gs_vertbuffer_t **verts,
 	fillVert(0.0f, 0.0f, 1.0f, 1.0f);
 }
 
-static void drawHandle(int x, int y, bool selected,
-	gs_vertbuffer_t **verts, int index) {
+static void drawHandle(int x, int y, bool selected, gs_vertbuffer_t **verts,
+		       int index)
+{
 	int size = 5;
 
 	if (verts[index])
 		gs_vertexbuffer_destroy(verts[index]);
 
 	gs_render_start(true);
-	gs_vertex2f(x-size, y-size);
-	gs_vertex2f(x+size, y-size);
-	gs_vertex2f(x+size, y+size);
-	gs_vertex2f(x-size, y+size);
-	gs_vertex2f(x-size, y-size);
+	gs_vertex2f(x - size, y - size);
+	gs_vertex2f(x + size, y - size);
+	gs_vertex2f(x + size, y + size);
+	gs_vertex2f(x - size, y + size);
+	gs_vertex2f(x - size, y - size);
 	verts[index] = gs_render_save();
 
 	gs_load_vertexbuffer(verts[index]);
@@ -380,7 +386,7 @@ static void drawHandle(int x, int y, bool selected,
 
 void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 {
-	CornerPinWidget *window = static_cast<CornerPinWidget*>(data);
+	CornerPinWidget *window = static_cast<CornerPinWidget *>(data);
 
 	if (!window->source)
 		return;
@@ -395,31 +401,34 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 	uint32_t areaCX;
 	uint32_t areaCY;
 
-	vec2  itemScale, itemSize, pos;
+	vec2 itemScale, itemSize, pos;
 	itemScale.x = 1.0f;
 	itemScale.y = 1.0f;
 
-	int   x, y;
-	int   newCX, newCY;
-	int   offX, offY;
+	int x, y;
+	int newCX, newCY;
+	int offX, offY;
 	float scale;
 
-	if(window->sceneitem) {
+	if (window->sceneitem) {
 		obs_sceneitem_get_scale(window->sceneitem, &itemScale);
 
-		if(window->zoom) {
-			areaCX = max(obs_source_get_width(window->source), 1u)
-				* itemScale.x;
-			areaCY = max(obs_source_get_height(window->source), 1u)
-				* itemScale.y;
+		if (window->zoom) {
+			areaCX = max(obs_source_get_width(window->source), 1u) *
+				 itemScale.x;
+			areaCY =
+				max(obs_source_get_height(window->source), 1u) *
+				itemScale.y;
 		} else {
 			areaCX = sceneCX;
 			areaCY = sceneCY;
 
-			itemSize.x = max(obs_source_get_width(window->source), 1u)
-				* itemScale.x;
-			itemSize.y = max(obs_source_get_width(window->source), 1u)
-				* itemScale.x;
+			itemSize.x =
+				max(obs_source_get_width(window->source), 1u) *
+				itemScale.x;
+			itemSize.y =
+				max(obs_source_get_width(window->source), 1u) *
+				itemScale.x;
 		}
 
 		obs_sceneitem_get_pos(window->sceneitem, &pos);
@@ -450,12 +459,11 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 	gs_viewport_push();
 	gs_projection_push();
 
-	if(window->sceneitem && window->zoom) {
-		gs_ortho(offX, areaCX + offX, offY, areaCY + offY,
-			-100.0f, 100.0f);
+	if (window->sceneitem && window->zoom) {
+		gs_ortho(offX, areaCX + offX, offY, areaCY + offY, -100.0f,
+			 100.0f);
 	} else {
-		gs_ortho(0.0f, sceneCX, 0.0f, sceneCY,
-			-100.0f, 100.0f);
+		gs_ortho(0.0f, sceneCX, 0.0f, sceneCY, -100.0f, 100.0f);
 	}
 
 	gs_set_viewport(x, y, newCX, newCY);
@@ -465,7 +473,7 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 	if (obs_sceneitem_visible(window->sceneitem)) {
 		if (window->sceneitem && window->zoom) {
 			gs_ortho(0.0f, float(sceneCX), 0.0f, float(sceneCY),
-				-100.0f, 100.0f);
+				 -100.0f, 100.0f);
 			offX = 0;
 			offY = 0;
 
@@ -474,44 +482,51 @@ void CornerPinWidget::drawPreview(void *data, uint32_t cx, uint32_t cy)
 		}
 
 		drawLine(filter->topLeftX * itemScale.x + offX,
-			filter->topLeftY * itemScale.y + offY,
-			filter->topRightX * itemScale.x + offX,
-			filter->topRightY * itemScale.y + offY, window->verts, 0);
+			 filter->topLeftY * itemScale.y + offY,
+			 filter->topRightX * itemScale.x + offX,
+			 filter->topRightY * itemScale.y + offY, window->verts,
+			 0);
 		drawLine(filter->topRightX * itemScale.x + offX,
-			filter->topRightY * itemScale.y + offY,
-			filter->bottomRightX * itemScale.x + offX,
-			filter->bottomRightY * itemScale.y + offY, window->verts, 1);
+			 filter->topRightY * itemScale.y + offY,
+			 filter->bottomRightX * itemScale.x + offX,
+			 filter->bottomRightY * itemScale.y + offY,
+			 window->verts, 1);
 		drawLine(filter->bottomRightX * itemScale.x + offX,
-			filter->bottomRightY * itemScale.y + offY,
-			filter->bottomLeftX * itemScale.x + offX,
-			filter->bottomLeftY * itemScale.y + offY, window->verts, 2);
+			 filter->bottomRightY * itemScale.y + offY,
+			 filter->bottomLeftX * itemScale.x + offX,
+			 filter->bottomLeftY * itemScale.y + offY,
+			 window->verts, 2);
 		drawLine(filter->bottomLeftX * itemScale.x + offX,
-			filter->bottomLeftY * itemScale.y + offY,
-			filter->topLeftX * itemScale.x + offX,
-			filter->topLeftY * itemScale.y + offY, window->verts, 3);
+			 filter->bottomLeftY * itemScale.y + offY,
+			 filter->topLeftX * itemScale.x + offX,
+			 filter->topLeftY * itemScale.y + offY, window->verts,
+			 3);
 
 		drawHandle(filter->topLeftX * itemScale.x + offX,
-			filter->topLeftY * itemScale.y + offY,
-			window->selected == 1, window->verts, 4);
+			   filter->topLeftY * itemScale.y + offY,
+			   window->selected == 1, window->verts, 4);
 		drawHandle(filter->topRightX * itemScale.x + offX,
-			filter->topRightY * itemScale.y + offY,
-			window->selected == 2, window->verts, 5);
+			   filter->topRightY * itemScale.y + offY,
+			   window->selected == 2, window->verts, 5);
 		drawHandle(filter->bottomLeftX * itemScale.x + offX,
-			filter->bottomLeftY * itemScale.y + offY,
-			window->selected == 3, window->verts, 6);
+			   filter->bottomLeftY * itemScale.y + offY,
+			   window->selected == 3, window->verts, 6);
 		drawHandle(filter->bottomRightX * itemScale.x + offX,
-			filter->bottomRightY * itemScale.y + offY,
-			window->selected == 4, window->verts, 7);
+			   filter->bottomRightY * itemScale.y + offY,
+			   window->selected == 4, window->verts, 7);
 
 		if (window->mouseDrag) {
 			uint32_t textWidth = obs_source_get_width(window->text);
-			uint32_t textHeight = obs_source_get_height(window->text);
+			uint32_t textHeight =
+				obs_source_get_height(window->text);
 
-			int tX = (window->movedMouse.x - pos.x)*itemScale.x + 10;
+			int tX = (window->movedMouse.x - pos.x) * itemScale.x +
+				 10;
 			tX = min(tX, (int)(sceneCX - textWidth - 10));
 			tX = max(tX, 10);
 
-			int tY = (window->movedMouse.y - pos.y)*itemScale.y - window->textSize / 2;
+			int tY = (window->movedMouse.y - pos.y) * itemScale.y -
+				 window->textSize / 2;
 			tY = min(tY, int(sceneCY - textHeight - 10));
 			tY = max(tY, 10);
 
@@ -552,16 +567,15 @@ void CornerPinWidget::paintEvent(QPaintEvent *event)
 
 void CornerPinWidget::showEvent(QShowEvent *event)
 {
-	if(display)
-		obs_display_add_draw_callback(this->GetDisplay(),
-			drawPreview, this);
+	if (display)
+		obs_display_add_draw_callback(this->GetDisplay(), drawPreview,
+					      this);
 	UNUSED_PARAMETER(event);
 }
 
 void CornerPinWidget::hideEvent(QHideEvent *event)
 {
-	obs_display_remove_draw_callback(this->GetDisplay(),
-		drawPreview, this);
+	obs_display_remove_draw_callback(this->GetDisplay(), drawPreview, this);
 
 	corner_pin_data *filter = (corner_pin_data *)filter_data;
 	obs_source_update_properties(filter->context);
@@ -583,7 +597,7 @@ void CornerPinWidget::mousePressEvent(QMouseEvent *event)
 	vec2_set(&scale, previewW / float(width), previewH / float(height));
 
 	vec2_set(&mouse, event->x() - offX, event->y() - offY);
-	if(!zoom) {
+	if (!zoom) {
 		vec2_div(&mouse, &mouse, &scale);
 		vec2_sub(&mouse, &mouse, &pos);
 		vec2_div(&mouse, &mouse, &itemScale);
@@ -633,7 +647,7 @@ void CornerPinWidget::mouseMoveEvent(QMouseEvent *event)
 	int addY = !zoom ? 0 : pos.y / itemScale.y;
 
 	vec2_set(&movedMouse, event->x() - offX, event->y() - offY);
-	vec2_mulf(&movedMouse, &movedMouse, 1/previewScale);
+	vec2_mulf(&movedMouse, &movedMouse, 1 / previewScale);
 
 	if (!zoom) {
 		vec2_sub(&movedMouse, &movedMouse, &pos);
@@ -669,18 +683,20 @@ void CornerPinWidget::mouseMoveEvent(QMouseEvent *event)
 		} else if (selected == 4) {
 			filter->bottomRightX = movedMouse.x;
 			filter->bottomRightY = movedMouse.y;
-			obs_data_set_int(settings, "bottomRightX", movedMouse.x);
-			obs_data_set_int(settings, "bottomRightY", movedMouse.y);
+			obs_data_set_int(settings, "bottomRightX",
+					 movedMouse.x);
+			obs_data_set_int(settings, "bottomRightY",
+					 movedMouse.y);
 		}
 
 		obs_data_t *textSettings = obs_source_get_settings(text);
-		obs_data_set_string(textSettings, "text", ("("
-			+ to_string((int)movedMouse.x) + ", "
-			+ to_string((int)movedMouse.y) + ")").c_str());
+		obs_data_set_string(textSettings, "text",
+				    ("(" + to_string((int)movedMouse.x) + ", " +
+				     to_string((int)movedMouse.y) + ")")
+					    .c_str());
 
 		obs_source_update(text, textSettings);
 		obs_data_release(textSettings);
-
 	}
 
 	obs_data_release(settings);
@@ -694,10 +710,11 @@ void CornerPinWidget::wheelEvent(QWheelEvent *event)
 		if (event->angleDelta().y() >= 0) {
 			textSize = obs_data_get_int(font, "size") + 2;
 		} else {
-			textSize = max((int)obs_data_get_int(font, "size") - 2, 2);
+			textSize =
+				max((int)obs_data_get_int(font, "size") - 2, 2);
 		}
 		obs_data_set_int(font, "size", textSize);
-		obs_data_set_int(textSettings, "outline_size", textSize/10);
+		obs_data_set_int(textSettings, "outline_size", textSize / 10);
 		obs_data_set_obj(textSettings, "font", font);
 		obs_source_update(text, textSettings);
 

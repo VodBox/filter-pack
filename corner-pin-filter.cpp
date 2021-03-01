@@ -5,29 +5,29 @@
 #include "corner-pin-widget.hpp"
 
 struct corner_pin_data {
-	obs_source_t                   *context;
+	obs_source_t *context;
 
-	gs_effect_t                    *effect;
-	gs_eparam_t                    *uv1_param, *uv2_param, *uv3_param, *uv4_param;
-	gs_eparam_t                    *width, *height;
+	gs_effect_t *effect;
+	gs_eparam_t *uv1_param, *uv2_param, *uv3_param, *uv4_param;
+	gs_eparam_t *width, *height;
 	gs_eparam_t *outline_param;
 
-	int                            topLeftX;
-	int                            topRightX;
-	int                            bottomLeftX;
-	int                            bottomRightX;
-	int                            topLeftY;
-	int                            topRightY;
-	int                            bottomLeftY;
-	int                            bottomRightY;
-	float                          texwidth, texheight;
-	struct vec2                    uv1;
-	struct vec2                    uv2;
-	struct vec2                    uv3;
-	struct vec2                    uv4;
+	int topLeftX;
+	int topRightX;
+	int bottomLeftX;
+	int bottomRightX;
+	int topLeftY;
+	int topRightY;
+	int bottomLeftY;
+	int bottomRightY;
+	float texwidth, texheight;
+	struct vec2 uv1;
+	struct vec2 uv2;
+	struct vec2 uv3;
+	struct vec2 uv4;
 	bool outline;
 
-	CornerPinWindow                *window;
+	CornerPinWindow *window;
 };
 
 static const char *corner_pin_getname(void *unused)
@@ -75,8 +75,8 @@ static void corner_pin_destroy(void *data)
 
 static void *corner_pin_create(obs_data_t *settings, obs_source_t *context)
 {
-	struct corner_pin_data *filter = (corner_pin_data *)
-		bzalloc(sizeof(struct corner_pin_data));
+	struct corner_pin_data *filter =
+		(corner_pin_data *)bzalloc(sizeof(struct corner_pin_data));
 	char *effect_path = obs_module_file("corner_pin_filter.effect");
 
 	filter->context = context;
@@ -86,20 +86,20 @@ static void *corner_pin_create(obs_data_t *settings, obs_source_t *context)
 	filter->effect = gs_effect_create_from_file(effect_path, NULL);
 
 	if (filter->effect) {
-		filter->uv1_param = gs_effect_get_param_by_name(
-			filter->effect, "uv1");
-		filter->uv2_param = gs_effect_get_param_by_name(
-			filter->effect, "uv2");
-		filter->uv3_param = gs_effect_get_param_by_name(
-			filter->effect, "uv3");
-		filter->uv4_param = gs_effect_get_param_by_name(
-			filter->effect, "uv4");
-		filter->outline_param = gs_effect_get_param_by_name(
-			filter->effect, "outline");
-		filter->width = gs_effect_get_param_by_name(
-			filter->effect, "texwidth");
-		filter->height = gs_effect_get_param_by_name(
-			filter->effect, "texheight");
+		filter->uv1_param =
+			gs_effect_get_param_by_name(filter->effect, "uv1");
+		filter->uv2_param =
+			gs_effect_get_param_by_name(filter->effect, "uv2");
+		filter->uv3_param =
+			gs_effect_get_param_by_name(filter->effect, "uv3");
+		filter->uv4_param =
+			gs_effect_get_param_by_name(filter->effect, "uv4");
+		filter->outline_param =
+			gs_effect_get_param_by_name(filter->effect, "outline");
+		filter->width =
+			gs_effect_get_param_by_name(filter->effect, "texwidth");
+		filter->height = gs_effect_get_param_by_name(filter->effect,
+							     "texheight");
 	}
 
 	obs_leave_graphics();
@@ -115,9 +115,8 @@ static void *corner_pin_create(obs_data_t *settings, obs_source_t *context)
 	return filter;
 }
 
-static void calc_uv(struct corner_pin_data *filter,
-	struct vec2 *uv1, struct vec2 *uv2,
-	struct vec2 *uv3, struct vec2 *uv4)
+static void calc_uv(struct corner_pin_data *filter, struct vec2 *uv1,
+		    struct vec2 *uv2, struct vec2 *uv3, struct vec2 *uv4)
 {
 	obs_source_t *target = obs_filter_get_target(filter->context);
 	uint32_t width;
@@ -127,8 +126,7 @@ static void calc_uv(struct corner_pin_data *filter,
 		width = 0;
 		height = 0;
 		return;
-	}
-	else {
+	} else {
 		width = obs_source_get_base_width(target);
 		height = obs_source_get_base_height(target);
 	}
@@ -146,7 +144,8 @@ static void calc_uv(struct corner_pin_data *filter,
 	uv4->y = (float)filter->bottomRightY / (float)height;
 }
 
-static void corner_pin_tick(void *data, float seconds) {
+static void corner_pin_tick(void *data, float seconds)
+{
 	struct corner_pin_data *filter = (corner_pin_data *)data;
 
 	vec2_zero(&filter->uv1);
@@ -163,7 +162,7 @@ static void corner_pin_render(void *data, gs_effect_t *effect)
 	struct corner_pin_data *filter = (corner_pin_data *)data;
 
 	if (!obs_source_process_filter_begin(filter->context, GS_RGBA,
-				OBS_ALLOW_DIRECT_RENDERING))
+					     OBS_ALLOW_DIRECT_RENDERING))
 		return;
 
 	gs_effect_set_vec2(filter->uv1_param, &filter->uv1);
@@ -175,16 +174,17 @@ static void corner_pin_render(void *data, gs_effect_t *effect)
 	gs_effect_set_bool(filter->outline_param, filter->outline);
 
 	obs_source_process_filter_end(filter->context, filter->effect, 0, 0);
-	
+
 	UNUSED_PARAMETER(effect);
 }
 
-static bool openUI(obs_properties_t *props, obs_property_t *property, void *data)
+static bool openUI(obs_properties_t *props, obs_property_t *property,
+		   void *data)
 {
 	struct corner_pin_data *filter = (corner_pin_data *)data;
 	obs_source_t *target = obs_filter_get_target(filter->context);
 
-	if(!filter->window)
+	if (!filter->window)
 		filter->window = new CornerPinWindow(nullptr, target, filter);
 	filter->window->show();
 	return true;
@@ -196,14 +196,22 @@ static obs_properties_t *corner_pin_properties(void *data)
 
 	obs_properties_add_button(props, "openUI", "Open", openUI);
 
-	obs_properties_add_int_slider(props, "topLeftX", "Top Left X", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "topLeftY", "Top Left Y", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "topRightX", "Top Right X", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "topRightY", "Top Right Y", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "bottomLeftX", "Bottom Left X", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "bottomLeftY", "Bottom Left Y", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "bottomRightX", "Bottom Right X", -8192, 8192, 1);
-	obs_properties_add_int_slider(props, "bottomRightY", "Bottom Right Y", -8192, 8192, 1);
+	obs_properties_add_int_slider(props, "topLeftX", "Top Left X", -8192,
+				      8192, 1);
+	obs_properties_add_int_slider(props, "topLeftY", "Top Left Y", -8192,
+				      8192, 1);
+	obs_properties_add_int_slider(props, "topRightX", "Top Right X", -8192,
+				      8192, 1);
+	obs_properties_add_int_slider(props, "topRightY", "Top Right Y", -8192,
+				      8192, 1);
+	obs_properties_add_int_slider(props, "bottomLeftX", "Bottom Left X",
+				      -8192, 8192, 1);
+	obs_properties_add_int_slider(props, "bottomLeftY", "Bottom Left Y",
+				      -8192, 8192, 1);
+	obs_properties_add_int_slider(props, "bottomRightX", "Bottom Right X",
+				      -8192, 8192, 1);
+	obs_properties_add_int_slider(props, "bottomRightY", "Bottom Right Y",
+				      -8192, 8192, 1);
 	obs_properties_add_bool(props, "outline", "Display Box");
 
 	UNUSED_PARAMETER(data);
@@ -216,7 +224,7 @@ static void corner_pin_defaults(obs_data_t *settings)
 }
 
 struct obs_source_info corner_pin_filter = [&] {
-	obs_source_info corner_pin_filter = { 0 };
+	obs_source_info corner_pin_filter = {0};
 
 	corner_pin_filter.id = "corner_pin_filter";
 	corner_pin_filter.type = OBS_SOURCE_TYPE_FILTER;

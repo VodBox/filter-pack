@@ -64,6 +64,7 @@ class CornerPinWidget : public QWidget {
 	void mouseReleaseEvent(QMouseEvent *event) override;
 	void mouseMoveEvent(QMouseEvent *event) override;
 	void wheelEvent(QWheelEvent *event) override;
+
 public:
 	obs_source_t *source;
 	obs_sceneitem_t *sceneitem = nullptr;
