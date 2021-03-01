@@ -1,0 +1,61 @@
+uniform float4x4 ViewProj;
+uniform texture2d image;
+
+uniform int width;
+uniform float4 color;
+uniform bool sharp;
+
+uniform int texheight;
+uniform int texwidth;
+
+sampler_state textureSampler {
+	Filter    = Linear;
+	AddressU  = Border;
+	AddressV  = Border;
+	BorderColor = 00000000;
+};
+
+struct VertData {
+	float4 pos : POSITION;
+	float2 uv  : TEXCOORD0;
+};
+
+VertData VSStroke(VertData v_in)
+{
+	VertData vert_out;
+	vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+	vert_out.uv = v_in.uv;
+	return vert_out;
+}
+
+float4 PSStroke(VertData v_in) : TARGET
+{
+	float4 over = image.Sample(textureSampler, v_in.uv);
+	float a = 0.0;
+	
+	bool done = false;
+	
+	for (int x = -1; x < 2 && !done; x++) {
+		for (int y = -1; y < 2 && !done; y++) {
+			if (!(x == 0 && y == 0) && (sharp || abs(x + y) == -1 || abs(x + y) == 1)) {
+				float2 newUv = v_in.uv + float2(x * 1.0 / texwidth, y * 1.0 / texheight);
+				
+				if (image.Sample(textureSampler, newUv).a > 0.0) {
+					a = 1.0;
+					done = true;
+				}
+			}
+		}
+	}
+	
+	return over * over.a + float4(color.rgb, a) * (1.0 - over.a);
+}
+
+technique Draw
+{
+	pass
+	{
+		vertex_shader = VSStroke(v_in);
+		pixel_shader  = PSStroke(v_in);
+	}
+}

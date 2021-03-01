@@ -8,7 +8,8 @@ set(filter-pack_SOURCES
 	filter-pack.cpp
 	corner-pin-filter.cpp
 	corner-pin-widget.cpp
-	lens-distortion-filter.cpp)
+	lens-distortion-filter.cpp
+	stroke-filter.cpp)
 	
 set(filter-pack_HEADERS
 	corner-pin-widget.hpp)
